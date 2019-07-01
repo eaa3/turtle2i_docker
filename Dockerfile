@@ -1,58 +1,103 @@
-# [SSH IGNORE]
+FROM nvidia/cuda:8.0-cudnn6-devel-ubuntu16.04
 
-FROM nvidia/opengl:1.0-glvnd-runtime-ubuntu16.04
-ENV NVIDIA_DRIVER_CAPABILITIES ${NVIDIA_DRIVER_CAPABILITIES},display
-MAINTAINER Jim Mainprice <jim.mainprice@ipvs.uni-stuttgart.de>
+# Requirement:
+# install nvidia-docker,
+# container must be started with nvidia-docker
 
-###################################################################################
-# This Dockerfile is also used to generate the official image install ssh 
-# script. (see desktop_update folder in amd-clmc/official_images)
-# The [SSH IGNORE*]  [/SSH IGNORE*] ; [SSH ONLY*] [/SSH ONLY*] tags are here to indicate
-# what will go in the official ssh install script and what will not
-###################################################################################
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+ENV PATH /usr/local/nvidia/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
-# [/SSH IGNORE]
+# build setups follows indigo-ros-core -> indigo-ros-base -> indigo-desktop-full
+# only difference is not based on ubuntu:trusty
 
-###############################################################################
-# We add all other repositories.
-###############################################################################
-RUN apt-get update && \
-    apt-get install -y \
-    curl \
-    wget \
-    git \
-    build-essential \
-    software-properties-common \
-    apt-transport-https
+ENV DEBIAN_FRONTEND noninteractive
 
-RUN echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list && \
-    wget http://packages.ros.org/ros.key -O - | apt-key add -
+#ARG http_proxy
+#ARG https_proxy
 
-RUN apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116
+#ENV http_proxy=$http_proxy
+#ENV https_proxy=$https_proxy
 
-# Install sublimetext
-RUN wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | apt-key add - && \
-    echo "deb https://download.sublimetext.com/ apt/stable/" | tee /etc/apt/sources.list.d/sublime-text.list && \
-    apt-get update && \
-    apt-get install -y sublime-text
 
-RUN apt-get install -y \
-    python-pip \
-    python-catkin-tools \
+# install packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dirmngr \
+    gnupg2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# setup keys
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+
+# setup sources.list
+RUN echo "deb http://packages.ros.org/ros/ubuntu xenial main" > /etc/apt/sources.list.d/ros-latest.list
+
+# install bootstrap tools
+RUN apt-get update && apt-get install --no-install-recommends --allow-unauthenticated -y \
     python-rosdep \
     python-rosinstall \
-    python-rospkg \
-    python-wstool 
+    python-vcstools \
+    && rm -rf /var/lib/apt/lists/*
+
+# setup environment
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
+# bootstrap rosdep
+RUN rosdep init \
+    && rosdep update
+
+# install ros packages
+ENV ROS_DISTRO kinetic
+RUN apt-get update && apt-get install -y \
+    ros-kinetic-ros-core=1.3.2-0* \
+&& rm -rf /var/lib/apt/lists/*
 
 
-RUN apt-get install -y \
-    ros-kinetic-desktop-full \
-    ros-kinetic-turtlebot-* \
-    libudev-dev \
-    ros-kinetic-controller-manager \
-    python-wxgtk3.0 \
-    ros-kinetic-manipulation-msgs \
-    ros-kinetic-xacro  
+# install ros packages
+RUN apt-get update && apt-get install -y \
+    ros-kinetic-ros-base=1.3.2-0* \
+&& rm -rf /var/lib/apt/lists/*
+
+# install ros desktop full packages
+RUN apt-get update && apt-get install -y \
+    ros-kinetic-desktop-full=1.3.2-0* \
+    && rm -rf /var/lib/apt/lists/*
+
+
+
+# setup entrypoint, need entrypoint.sh in the same folder with Dockerfile
+COPY ./ros_entrypoint.sh /
+
+
+# installs avahi for local network discovery (required for using the real robot)
+RUN apt-get update && apt-get install -y \
+    avahi-daemon avahi-utils
+
+
+# Dependencies for baxter and sawyer simulator
+RUN apt-get update && \ 
+    apt-get -y install sudo apt-utils python-pip python-scipy libprotobuf-dev protobuf-compiler \
+                       python-rosinstall python-rosinstall-generator python-wstool build-essential \
+                       ros-kinetic-ros-controllers ros-kinetic-ros-control ros-kinetic-moveit git-core \
+                       ros-kinetic-gazebo-ros-control ros-kinetic-control-msgs ros-kinetic-rtabmap-ros \
+                       ros-kinetic-controller-manager ros-kinetic-manipulation-msgs ros-kinetic-xacro \
+                       ros-kinetic-control-toolbox ros-kinetic-realtime-tools ros-kinetic-turtlebot-* \
+                       libudev-dev ros-kinetic-octomap-ros ros-kinetic-cv-bridge python-wxgtk3.0 \
+                       ros-kinetic-find-object-2d && \
+    rm -rf /var/lib/apt/lists/*
+ 
+
+# RUN pip install --upgrade pip && \
+#     pip install protobuf && \
+#     pip install pandas
+
+#six PySide
+# RUN pip install --upgrade pip==9.0.3 && \
+#     pip install protobuf numpy decorator ipython jupyter matplotlib Pillow scipy pandas
+
+
+
 
 ENV ROS_DISTRO kinetic
 
@@ -62,68 +107,17 @@ ENV TURTLEBOT_3D_SENSOR2=sr300
 ENV TURTLEBOT_BATTERY=None
 ENV TURTLEBOT_STACKS=interbotix
 ENV TURTLEBOT_ARM=pincher
-# TODO
-# ros-kinetic-fcl \ NOT ON KINETIC
-# ros-kinetic-keyboard \ NOT ON KINETIC
-
-RUN rosdep init && rosdep update
 
 
 ###############################################################################
 # PINOCCHIO
 ###############################################################################
-RUN cd /tmp && \
-    git clone --recursive https://github.com/stack-of-tasks/eigenpy && \
-    cd eigenpy && mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/pinocchio/ && \
-    make install && rm -rf /tmp/eigenpy
-RUN cd /tmp && \
-    git clone --recursive https://github.com/stack-of-tasks/pinocchio && \
-    cd pinocchio && mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/pinocchio/ && \
-    make install && rm -rf /tmp/pinocchio
+#RUN cd /tmp && \
+#    git clone --recursive https://github.com/stack-of-tasks/eigenpy && \
+#    cd eigenpy && mkdir build && cd build && \
+#    cmake .. -DCMAKE_BUILD_TYPE=Release \
+#        -DCMAKE_INSTALL_PREFIX=/usr/local/pinocchio/ && \
+#    make install && rm -rf /tmp/eigenpy
 
-###############################################################################
-# PYTHON MODULES
-###############################################################################
-
-# RUN pip install --upgrade pip
-# RUN pip install pyopenssl
-# RUN pip install --upgrade \
-#     colorama \
-#     matplotlib \
-#     ndg-httpsclient \
-#     numpy \
-#     pyasn1 \
-#     schedule \
-#     scipy \
-#     sklearn \
-#     virtualenv \
-#     appdirs \
-#     h5py \
-#     keras \
-#     ipython \
-#     ipdb \
-#     graphviz \
-#     zmq
-# RUN pip install pydot==1.0.28
-# RUN pip install pyparsing==2.0.1
-# RUN pip install --upgrade six --target="/usr/lib/python2.7/dist-packages"
-# RUN pip install appdirs
-# RUN pip install --upgrade protobuf
-
-#[SSH IGNORE]
-#########################################
-# for convenience, to map workspace in it
-#########################################
-# RUN mkdir /workspace
-# RUN mkdir /ssh
-# RUN mkdir /hrmdock
-#[/SSH IGNORE]
-
-########################
-# start ssh agent
-########################
-# RUN eval `ssh-agent -s`
+#ENTRYPOINT ["/ros_entrypoint.sh"]
+#CMD ["bash"]
