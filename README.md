@@ -30,29 +30,17 @@
 
 Outside docker (in the host machine), follow the steps:
 
-0. `mkdir -p ~/Projects/turtlebot2i/src`
-
-1. `cd ~/Projects/turtlebot2i/src`
-
-2. `git clone https://github.com/eaa3/turtlebot2i .`
-
-3. `git clone https://github.com/Interbotix/arbotix_ros.git -b turtlebot2i`
-
-4. `git clone https://github.com/Interbotix/phantomx_pincher_arm.git`
-
-5. `git clone https://github.com/Interbotix/ros_astra_camera -b filterlibrary`
-
-6. `git clone https://github.com/Interbotix/ros_astra_launch`
-
+0. `./fetch_packages.sh`
 
 # Building turtle2i packages
 
-You must run the following commands inside the docker container with the pre-installed dependencies. To start the docker container you can run:
+0. Quick script to build packages: `./build_turtle.sh turtle`
 
+(Manual option) You must run the following commands inside the docker container with the pre-installed dependencies. To start the docker container you can run:
 
 
 0. `cd ~/Projects/turtle2i_docker`
-1. Run the container: `./bash turtle` 
+1. Run the container: `./bash.sh turtle` 
 2. Setup ROS: `source /opt/ros/kinetic/setup.bash`
 3. `catkin_make`
 4. Source the catkin workspace: `source devel/setup.bash`
@@ -67,7 +55,9 @@ Ps.: You can open other terminals inside the same container by running the scrip
 
 After building successfully. Run the following command in a terminal inside the turtle docker container:
 
-`roslaunch turtlebot2i_gazebo turtlebot_world.launch`
+0. Run the container: `./bash.sh turtle` 
+
+1. `roslaunch turtlebot2i_gazebo turtlebot_world.launch`
 
 (don't forget to source devel/setup.bash beforehand in every terminal you open inside the turtle docker container)
 
