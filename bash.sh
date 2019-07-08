@@ -45,14 +45,14 @@ xdocker run -it \
        --network="host" \
        --privileged \
        --env="QT_X11_NO_MITSHM=1" \
-       --workdir="/home/$USER/Projects/hp_ws/turtlebot2i" \
+       --workdir="/home/$USER/turtlebot2i" \
        --volume="/home/$USER:/home/$USER" \
        --volume="/etc/group:/etc/group:ro" \
        --volume="/etc/passwd:/etc/passwd:ro" \
        --volume="/etc/shadow:/etc/shadow:ro" \
        --volume="/etc/sudoers.d:/etc/sudoers.d:ro" \
        --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-       --volume="${WORK_DIR}:/home/Projects" ${extra_params} \
+       --volume="${WORK_DIR}:/home/" ${extra_params} \
        $DOCKER_IMAGE \
        bash 
 
